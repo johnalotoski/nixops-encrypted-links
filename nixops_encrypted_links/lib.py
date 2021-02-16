@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import (
+    cast,
     Dict,
     Optional,
     Set,
@@ -93,6 +94,10 @@ def mk_matrix(d: Deployment) -> Dict[str, List[Dict[Tuple[str, ...], Any]]]:
     }
 
     def do_machine(m: nixops.backends.MachineState) -> None:
+        # Skip configuration if the machine is excluded from deployment
+        if not m.defn:
+            return
+
         defn = to_encrypted_links_defn(m.defn)
 
         attrs_list = attrs_per_resource[m.name]
@@ -167,6 +172,13 @@ def mk_matrix(d: Deployment) -> Dict[str, List[Dict[Tuple[str, ...], Any]]]:
     def emit_resource(r: nixops.resources.ResourceState) -> None:
         config = attrs_per_resource[r.name]
         if is_machine(r):
+            # NOTE: unfortunate mypy doesn't check that is_machine calls an isinstance() function
+            r = cast(nixops.backends.GenericMachineState, r)
+
+            # Skip resource emission if the machine is excluded from deployment
+            if not r.defn:
+                return
+
             # Sort the hosts by its canonical host names.
             sorted_hosts = sorted(
                 hosts[r.name].items(), key=lambda item: item[1][0]
